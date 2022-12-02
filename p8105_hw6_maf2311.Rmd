@@ -8,6 +8,8 @@ December 3, 2022
 
 ```{r setup, include = FALSE}
 library(tidyverse)
+library(viridis)
+library(modelr)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -32,7 +34,7 @@ scale_fill_discrete = scale_fill_viridis_d
 
 2017 Central Park weather data
 
-```{r}
+```{r q1_load_data}
 weather_df = 
   rnoaa::meteo_pull_monitors(
     c("USW00094728"),
@@ -51,7 +53,35 @@ The boostrap is helpful when you’d like to perform inference for a parameter /
 * r̂ 2
 * log(β̂ 0∗β̂ 1)
 
-Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂ 2 and log(β̂ 0∗β̂ 1). Note: broom::glance() is helpful for extracting r̂ 2 from a fitted regression, and broom::tidy() (with some additional wrangling) should help in computing log(β̂ 0∗β̂ 1).
+Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂ 2 and log(β̂ 0∗β̂ 1). Note: broom::glance() is helpful for extracting r̂ 2 from a fitted regression, and broom::tidy() (with some additional wrangling) should help in computing log(β̂ 0∗β̂ 1)
+
+```{r q1}
+weather_df %>% 
+  modelr::bootstrap(n = 1000) %>% 
+  mutate(
+    models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+    results = map(models, broom::glance)) %>% 
+  select(-strap, -models) %>% 
+  unnest(results) %>% 
+  ggplot(aes(x = r.squared)) + geom_density()
+```
+
+```{r q1.2}
+weather_df %>% 
+  modelr::bootstrap(n = 1000) %>% 
+  mutate(
+    models = map(strap, ~lm(tmax ~ tmin, data = .x) ),
+    results = map(models, broom::tidy)) %>% 
+  select(-strap, -models) %>% 
+  unnest(results) %>% 
+  select(id = `.id`, term, estimate) %>% 
+  pivot_wider(
+    names_from = term, 
+    values_from = estimate) %>% 
+  rename(beta0 = `(Intercept)`, beta1 = tmin) %>% 
+  mutate(log_b0b1 = log(beta0 * beta1)) %>% 
+  ggplot(aes(x = log_b0b1)) + geom_density()
+```
 
 # Problem 2
 

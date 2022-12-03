@@ -34,7 +34,7 @@ scale_fill_discrete = scale_fill_viridis_d
 
 2017 Central Park weather data
 
-```{r q1_load_data}
+```{r 1_load_data}
 weather_df = 
   rnoaa::meteo_pull_monitors(
     c("USW00094728"),
@@ -55,7 +55,7 @@ The boostrap is helpful when you’d like to perform inference for a parameter /
 
 Use 5000 bootstrap samples and, for each bootstrap sample, produce estimates of these two quantities. Plot the distribution of your estimates, and describe these in words. Using the 5000 bootstrap estimates, identify the 2.5% and 97.5% quantiles to provide a 95% confidence interval for r̂ 2 and log(β̂ 0∗β̂ 1). Note: broom::glance() is helpful for extracting r̂ 2 from a fitted regression, and broom::tidy() (with some additional wrangling) should help in computing log(β̂ 0∗β̂ 1)
 
-```{r q1}
+```{r 1}
 weather_df %>% 
   modelr::bootstrap(n = 1000) %>% 
   mutate(
@@ -66,7 +66,7 @@ weather_df %>%
   ggplot(aes(x = r.squared)) + geom_density()
 ```
 
-```{r q1.2}
+```{r 1.2}
 weather_df %>% 
   modelr::bootstrap(n = 1000) %>% 
   mutate(
@@ -121,13 +121,41 @@ homicides_logistic %>%
 
 The adjusted odds ratio for solving homicides for male victims is 0.426 (95% CI: 0.324,0.558) compared to female victims, keeping all other variables fixed.
 
-Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing male victims to female victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing male victims to female victims. 
 
 ```{r 2_glm_all_cities}
+nest_glm_cities =
+  homicides %>% 
+  nest(data = -city_state) %>% 
+  mutate(
+    models = map(data, ~glm(solved ~ victim_age + victim_race + victim_sex, data = ., family = binomial())),
+    results = map(models, broom::tidy)) %>% 
+  select(-data, -models) %>% 
+  unnest(results)
 
+nest_glm_cities = nest_glm_cities %>%
+  mutate(
+    OR = format(round(exp(estimate), 3), nsmall = 3),
+    lower = format(round(exp(estimate - (1.96*std.error)), 3), nsmall = 3),
+    upper = format(round(exp(estimate + (1.96*std.error)), 3), nsmall = 3)
+  ) %>%
+  filter(term == "victim_sexMale")
 ```
 
-Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
+Plot that shows the estimated ORs and CIs for each city, organized according to estimated OR
+
+```{r 2_plot}
+ggplot(nest_glm_cities, aes(x = city_state, y = OR)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  labs(
+    title = "Adjusted ORs and CIs for solving homicides comparing male victims to female victims",
+    x = "City",
+    y = "Adjusted OR",
+    caption = "Data from the Washington Post"
+  ) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+```
 
 # Problem 3
 

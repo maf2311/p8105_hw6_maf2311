@@ -11,6 +11,7 @@ library(tidyverse)
 library(viridis)
 library(modelr)
 library(mgcv)
+library(patchwork)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -173,14 +174,46 @@ birthweight %>% skimr::skim()
 #Based on the table output, there is no missing data
 ```
 
-Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
+Proposed regression model for birthweight, and plot: 
 
 ```{r 3_build_model}
 #this model is based on the hypothesized association between smoking during pregnancy and maternal weight gain during pregnancy,  and birthweight
 my_model = lm(bwt ~ smoken + wtgain, data = birthweight)
+
 my_model %>%
   broom::tidy()
+
+predictions = modelr::add_predictions(birthweight, my_model)
+residuals = modelr::add_residuals(birthweight, my_model)
+
+#plot
+smoken = birthweight %>% 
+  modelr::add_residuals(my_model) %>% 
+  ggplot(aes(x = smoken, y = resid)) + geom_violin() + 
+    labs(
+    title = "Smoken",
+    x = "Average number of cigarettes smoked per day during pregnancy",
+    y = "Residuals"
+  )
+
+wtgain = birthweight %>% 
+  modelr::add_residuals(my_model) %>% 
+  ggplot(aes(x = wtgain, y = resid)) + geom_violin() + 
+    labs(
+    title = "Wtgain",
+    x = "Mother’s weight gain during pregnancy (pounds)",
+    y = "Residuals"
+  )
+
+patchwork = smoken + wtgain
+patchwork + plot_annotation(
+  title = 'Model residuals against fitted values',
+  subtitle = 'my_model',
+  caption = 'Data on ~4000 children and their birthweight and other factors'
+)
 ```
+
+Modeling process: I looked at the main interactions between the average number of cigarettes smoked per day during pregnancy and the mother's weight gain (pounds) during pregnancy as predictors of birthweight. 
 
 Model Comparisons
 
@@ -199,7 +232,33 @@ head_length_sex_model %>%
   broom::tidy()
 
 #cross-validated prediction error (crossv_mc and purrr)
-#need TODO
+cv_df =
+  crossv_mc(birthweight, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+    )
+
+cv_df = 
+  cv_df %>% 
+  mutate(
+    my_model = map(train, ~lm(bwt ~ smoken + wtgain, data = .x)),
+    Length_age_model = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    head_length_sex_model = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = .x))) %>% 
+  mutate(
+    rmse_my_model = map2_dbl(my_model, test, ~rmse(model = .x, data = .y)),
+    rmse_Length_age = map2_dbl(Length_age_model, test, ~rmse(model = .x, data = .y)),
+    rmse_head_length_sex = map2_dbl(head_length_sex_model, test, ~rmse(model = .x, data = .y)))
+
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
 
 

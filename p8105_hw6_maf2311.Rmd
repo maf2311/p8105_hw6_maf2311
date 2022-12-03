@@ -10,6 +10,7 @@ December 3, 2022
 library(tidyverse)
 library(viridis)
 library(modelr)
+library(mgcv)
 
 knitr::opts_chunk$set(
 	echo = TRUE,
@@ -174,14 +175,32 @@ birthweight %>% skimr::skim()
 
 Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values – use add_predictions and add_residuals in making this plot.
 
-Compare your model to two others:
+```{r 3_build_model}
+#this model is based on the hypothesized association between smoking during pregnancy and maternal weight gain during pregnancy,  and birthweight
+my_model = lm(bwt ~ smoken + wtgain, data = birthweight)
+my_model %>%
+  broom::tidy()
+```
 
-One using length at birth and gestational age as predictors (main effects only)
-One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
-Make this comparison in terms of the cross-validated prediction error; use crossv_mc and functions in purrr as appropriate.
+Model Comparisons
 
-Note that although we expect your model to be reasonable, model building itself is not a main idea of the course and we don’t necessarily expect your model to be “optimal”.
+1. One using length at birth and gestational age as predictors (main effects only)
 
+2. One using head circumference, length, sex, and all interactions (including the three-way       interaction) between these
+
+```{r 3_comparisons}
+#1
+Length_age_model = lm(bwt ~ blength + gaweeks, data = birthweight)
+Length_age_model %>%
+  broom::tidy()
+#2
+head_length_sex_model = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = birthweight)
+head_length_sex_model %>%
+  broom::tidy()
+
+#cross-validated prediction error (crossv_mc and purrr)
+#need TODO
+```
 
 
 
